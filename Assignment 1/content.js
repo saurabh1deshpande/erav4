@@ -32,18 +32,29 @@ document.addEventListener('mouseup', async (event) => {
     // Create tooltip
     const tooltip = document.createElement('div');
     tooltip.id = 'highlight-meaning-tooltip';
-    tooltip.textContent = meaning;
+    tooltip.innerHTML = `
+      <div style="display: flex; align-items: center; font-weight: bold; font-size: 17px; margin-bottom: 8px; color: #39ff14; letter-spacing: 0.5px;">
+        <span style='display:inline-block;width:20px;height:20px;margin-right:8px;vertical-align:middle;'>
+          <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='#39ff14' width='20' height='20'>
+            <path d='M4 4v16h16V4H4zm2 2h12v12H6V6zm2 2v8h8V8H8zm2 2h4v4h-4v-4z'/>
+          </svg>
+        </span>
+        Meaning
+      </div>
+      <div style="font-size: 15px; color: #39ff14; background: #111; padding: 18px 20px; border-radius: 7px; box-shadow: 0 1px 2px rgba(0,0,0,0.10);">${meaning}</div>
+    `;
     tooltip.style.position = 'fixed';
     tooltip.style.zIndex = 99999;
-    tooltip.style.background = '#222';
-    tooltip.style.color = '#fff';
-    tooltip.style.padding = '8px 12px';
-    tooltip.style.borderRadius = '6px';
-    tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+    tooltip.style.background = '#000';
+    tooltip.style.color = '#39ff14';
+    tooltip.style.padding = '16px 18px';
+    tooltip.style.borderRadius = '10px';
+    tooltip.style.boxShadow = '0 4px 16px rgba(44,62,80,0.25)';
     tooltip.style.fontSize = '16px';
-    tooltip.style.maxWidth = '300px';
+    tooltip.style.maxWidth = '380px';
     tooltip.style.wordBreak = 'break-word';
     tooltip.style.pointerEvents = 'none';
+    tooltip.style.border = '1.5px solid #39ff14';
     // Position tooltip near mouse
     tooltip.style.left = `${event.clientX + 10}px`;
     tooltip.style.top = `${event.clientY + 10}px`;
