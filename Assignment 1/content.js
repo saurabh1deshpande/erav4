@@ -16,6 +16,7 @@ document.addEventListener('mouseup', async (event) => {
     let partOfSpeech = '';
     let phonetic = '';
     let audioUrl = '';
+    let example = '';
     try {
       const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(text)}`);
       if (response.ok) {
@@ -28,6 +29,8 @@ document.addEventListener('mouseup', async (event) => {
             phonetic = data[0].phonetics.find(p => p.text)?.text || '';
             audioUrl = data[0].phonetics.find(p => p.audio)?.audio || '';
           }
+          // Get example usage if available
+          example = data[0].meanings[0].definitions[0]?.example || '';
         } else {
           meaning = 'No definition found.';
         }
@@ -57,6 +60,7 @@ document.addEventListener('mouseup', async (event) => {
       <div style="font-size: 15px; color: #39ff14; background: #111; padding: 18px 20px; border-radius: 7px; box-shadow: 0 1px 2px rgba(0,0,0,0.10); pointer-events: none;">
         ${partOfSpeech ? `<span style='font-style:italic; color:#b0b0b0; font-size:14px;'>(${partOfSpeech})</span><br>` : ''}
         ${meaning}
+        ${example ? `<div style='margin-top:10px; color:#b0b0b0; font-size:14px;'><span style='color:#5dade2;'>Example:</span> "${example}"</div>` : ''}
       </div>
     `;
     tooltip.style.position = 'fixed';
@@ -71,15 +75,18 @@ document.addEventListener('mouseup', async (event) => {
     tooltip.style.wordBreak = 'break-word';
     tooltip.style.pointerEvents = 'auto';
     tooltip.style.border = '1.5px solid #39ff14';
-    // Position tooltip near mouse
-    tooltip.style.left = `${event.clientX + 10}px`;
-    tooltip.style.top = `${event.clientY + 10}px`;
+    // Store the position where the tooltip should appear
+    const tooltipLeft = event.clientX + 10;
+    const tooltipTop = event.clientY + 10;
+    tooltip.style.left = `${tooltipLeft}px`;
+    tooltip.style.top = `${tooltipTop}px`;
     document.body.appendChild(tooltip);
     if (audioUrl) {
       setTimeout(() => {
         const btn = document.getElementById('highlight-meaning-audio-btn');
         if (btn) {
           btn.onclick = (e) => {
+            e.preventDefault();
             e.stopPropagation();
             const audio = new Audio(audioUrl);
             audio.play();
