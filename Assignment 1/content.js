@@ -17,6 +17,7 @@ document.addEventListener('mouseup', async (event) => {
     let phonetic = '';
     let audioUrl = '';
     let example = '';
+    let synonyms = [];
     try {
       const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(text)}`);
       if (response.ok) {
@@ -31,6 +32,8 @@ document.addEventListener('mouseup', async (event) => {
           }
           // Get example usage if available
           example = data[0].meanings[0].definitions[0]?.example || '';
+          // Get synonyms if available
+          synonyms = data[0].meanings[0].definitions[0]?.synonyms || [];
         } else {
           meaning = 'No definition found.';
         }
@@ -61,6 +64,7 @@ document.addEventListener('mouseup', async (event) => {
         ${partOfSpeech ? `<span style='font-style:italic; color:#b0b0b0; font-size:14px;'>(${partOfSpeech})</span><br>` : ''}
         ${meaning}
         ${example ? `<div style='margin-top:10px; color:#b0b0b0; font-size:14px;'><span style='color:#5dade2;'>Example:</span> "${example}"</div>` : ''}
+        ${synonyms && synonyms.length > 0 ? `<div style='margin-top:10px; color:#b0b0b0; font-size:14px;'><span style='color:#5dade2;'>Synonyms:</span> ${synonyms.slice(0, 5).map(s => `<span style='color:#39ff14;'>${s}</span>`).join(', ')}</div>` : ''}
       </div>
     `;
     tooltip.style.position = 'fixed';
