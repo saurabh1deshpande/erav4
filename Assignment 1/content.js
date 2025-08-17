@@ -33,9 +33,9 @@ document.addEventListener('mouseup', async (event) => {
     const tooltip = document.createElement('div');
     tooltip.id = 'highlight-meaning-tooltip';
     tooltip.innerHTML = `
-      <div style="display: flex; align-items: center; font-weight: bold; font-size: 17px; margin-bottom: 8px; color: #39ff14; letter-spacing: 0.5px;">
+      <div style="display: flex; align-items: center; font-weight: bold; font-size: 17px; margin-bottom: 8px; color: #fff; letter-spacing: 0.5px;">
         <span style='display:inline-block;width:20px;height:20px;margin-right:8px;vertical-align:middle;'>
-          <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='#39ff14' width='20' height='20'>
+          <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='#fff' width='20' height='20'>
             <path d='M4 4v16h16V4H4zm2 2h12v12H6V6zm2 2v8h8V8H8zm2 2h4v4h-4v-4z'/>
           </svg>
         </span>
