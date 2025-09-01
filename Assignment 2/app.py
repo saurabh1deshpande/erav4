@@ -13,28 +13,31 @@ def parse_params(val: str) -> float:
     else:
         return float(val)
 
-# --- HTML Template with Bootstrap Styling & Sticky Values ---
+# --- HTML Template (Dark Professional Theme) ---
 TEMPLATE = """
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="utf-8">
-    <title>LLM Fine-tuning Calculator</title>
+    <title>LLM Resource Calculator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background: #f4f6f9; }
-        .card { border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .container { max-width: 900px; margin-top: 40px; }
-        h2 { font-weight: 600; margin-bottom: 20px; }
+        body { background-color: #121212; color: #e0e0e0; }
+        .card { border-radius: 16px; background-color: #1e1e1e; box-shadow: 0 4px 12px rgba(0,0,0,0.6); }
+        h2, h4 { font-weight: 600; }
         label { font-weight: 500; margin-top: 10px; }
-        .result-card { background: #ffffff; border-left: 5px solid #007bff; }
-        .section-title { margin-top: 15px; font-weight: 600; }
+        .result-card { border-left: 5px solid #0d6efd; }
+        .btn-primary { background-color: #0d6efd; border: none; }
+        .btn-primary:hover { background-color: #0b5ed7; }
+        .form-control, .form-select { background-color: #2a2a2a; border: 1px solid #444; color: #e0e0e0; }
+        .form-control:focus, .form-select:focus { background-color: #333; border-color: #0d6efd; color: #fff; }
+        .list-group-item { background-color: transparent; border-color: #333; color: #e0e0e0; }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container py-5">
         <div class="card p-4">
-            <h2>LLM Fine-tuning Resource Calculator</h2>
+            <h2 class="mb-4">LLM Resource Calculator</h2>
             <form method="post" class="row g-3">
                 <div class="col-md-6">
                     <label>Model Parameters</label>
@@ -79,18 +82,20 @@ TEMPLATE = """
 
         {% if result %}
         <div class="card p-4 mt-4 result-card">
-            <h4>Estimated Requirements</h4>
-            <div class="section-title">🔹 Training</div>
-            <ul class="list-group list-group-flush mb-3">
-                <li class="list-group-item"><b>Total GPU Memory Needed:</b> {{ result['train_mem'] }} GB</li>
-                <li class="list-group-item"><b>GPUs Required:</b> {{ result['train_gpus'] }}</li>
-                <li class="list-group-item"><b>Compute per token:</b> {{ result['train_flops'] | scientific }} FLOPs</li>
-            </ul>
-            <div class="section-title">🔹 Inference</div>
+            <h4>Fine-tuning Requirements</h4>
             <ul class="list-group list-group-flush">
-                <li class="list-group-item"><b>Total GPU Memory Needed:</b> {{ result['infer_mem'] }} GB</li>
-                <li class="list-group-item"><b>GPUs Required:</b> {{ result['infer_gpus'] }}</li>
-                <li class="list-group-item"><b>Compute per token:</b> {{ result['infer_flops'] | scientific }} FLOPs</li>
+                <li class="list-group-item"><b>Total GPU Memory Needed:</b> {{ result['fine_tune']['total_mem'] }} GB</li>
+                <li class="list-group-item"><b>GPUs Required:</b> {{ result['fine_tune']['gpus'] }}</li>
+                <li class="list-group-item"><b>Compute per token:</b> {{ result['fine_tune']['flops'] | scientific }} FLOPs</li>
+            </ul>
+        </div>
+
+        <div class="card p-4 mt-4 result-card">
+            <h4>Inference Requirements</h4>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item"><b>GPU Memory per Batch:</b> {{ result['inference']['total_mem'] }} GB</li>
+                <li class="list-group-item"><b>GPUs Required:</b> {{ result['inference']['gpus'] }}</li>
+                <li class="list-group-item"><b>Compute per forward pass:</b> {{ result['inference']['flops'] | scientific }} FLOPs</li>
             </ul>
         </div>
         {% endif %}
@@ -129,31 +134,36 @@ def index():
         else:
             bytes_per_param = 2
 
-        # --- Training Memory ---
+        # === Fine-tuning ===
         param_mem = (params * bytes_per_param) / 1e9
         if method == "full":
             opt_mem = param_mem * 2
             act_mem = param_mem * (seq_len / 2048) * (batch_size / 4)
-            train_mem = param_mem + opt_mem + act_mem
+            total_mem_ft = param_mem + opt_mem + act_mem
         elif method == "lora":
-            train_mem = (param_mem * 0.25) + 2
+            total_mem_ft = (param_mem * 0.25) + 2
         else:  # qlora
-            train_mem = (param_mem * 0.15) + 1.5
-        train_gpus = math.ceil(train_mem / gpu_capacity)
-        train_flops = 6 * params
+            total_mem_ft = (param_mem * 0.15) + 1.5
+        gpus_ft = math.ceil(total_mem_ft / gpu_capacity)
+        flops_ft = 6 * params  # FLOPs per token
 
-        # --- Inference Memory ---
-        infer_mem = param_mem + (param_mem * 0.2) * (seq_len / 2048) * (batch_size / 1)
-        infer_gpus = math.ceil(infer_mem / gpu_capacity)
-        infer_flops = 2 * params
+        # === Inference ===
+        act_mem_inf = param_mem * (seq_len / 2048) * (batch_size / 4)
+        total_mem_inf = param_mem + act_mem_inf
+        gpus_inf = math.ceil(total_mem_inf / gpu_capacity)
+        flops_inf = 2 * params  # forward pass FLOPs
 
         result = {
-            "train_mem": round(train_mem, 2),
-            "train_gpus": train_gpus,
-            "train_flops": train_flops,
-            "infer_mem": round(infer_mem, 2),
-            "infer_gpus": infer_gpus,
-            "infer_flops": infer_flops
+            "fine_tune": {
+                "total_mem": round(total_mem_ft, 2),
+                "gpus": gpus_ft,
+                "flops": flops_ft
+            },
+            "inference": {
+                "total_mem": round(total_mem_inf, 2),
+                "gpus": gpus_inf,
+                "flops": flops_inf
+            }
         }
 
     return render_template_string(TEMPLATE, result=result, form_data=form_data)
