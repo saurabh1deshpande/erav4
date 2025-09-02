@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Fine-tuning Resource Calculator</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+        .container { max-width: 500px; margin: 40px auto; background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; }
+        form { display: flex; flex-direction: column; gap: 12px; }
+        label { font-weight: bold; }
+        input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px; background: #007bff; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin-top: 20px; padding: 12px; background: #e9ffe9; border: 1px solid #b2ffb2; border-radius: 4px; }
+        .error { margin-top: 20px; padding: 12px; background: #ffe9e9; border: 1px solid #ffb2b2; border-radius: 4px; color: #b30000; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>LLM Fine-tuning Resource Calculator</h2>
+        <form method="post">
+            <label for="model_size_gb">Model Size (GB):</label>
+            <input type="number" step="0.01" min="0" name="model_size_gb" id="model_size_gb" required>
+
+            <label for="dataset_size_gb">Dataset Size (GB):</label>
+            <input type="number" step="0.01" min="0" name="dataset_size_gb" id="dataset_size_gb" required>
+
+            <label for="batch_size">Batch Size:</label>
+            <input type="number" min="1" name="batch_size" id="batch_size" required>
+
+            <label for="epochs">Epochs:</label>
+            <input type="number" min="1" name="epochs" id="epochs" required>
+
+            <button type="submit">Calculate</button>
+        </form>
+        {% if result %}
+            {% if result.error %}
+                <div class="error">Error: {{ result.error }}</div>
+            {% else %}
+                <div class="result">
+                    <strong>Estimated Memory Required:</strong> {{ result.memory }} GB<br>
+                    <strong>Estimated Compute Required:</strong> {{ result.compute }} GPU-hours
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</body>
+</html>
