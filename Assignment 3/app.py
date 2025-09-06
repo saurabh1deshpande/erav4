@@ -6,7 +6,7 @@ import math
 app = Flask(__name__)
 
 # Dummy Gemini API key (replace with your real key)
-GEMINI_API_KEY = 'AIzaSyCX2Ly4Zm_zW0USf_3pJMPOL-P9humLLWc'
+GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY'
 GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
 
 # Helper to parse parameter input like '7B', '750M', etc.
