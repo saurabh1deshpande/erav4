@@ -1,6 +1,7 @@
 from flask import Flask, render_template_string, request
 import requests
 import json
+import math
 
 app = Flask(__name__)
 
@@ -19,38 +20,67 @@ def parse_params(val: str) -> float:
         return float(val)
 
 # Convert number of parameters to model size in GB (assuming FP16, 2 bytes per param)
-def params_to_gb(params: float) -> float:
-    return params * 2 / 1e9
+def params_to_gb(params: float, precision: str) -> float:
+    if precision == "fp32":
+        bytes_per_param = 4
+    elif precision == "fp16":
+        bytes_per_param = 2
+    elif precision == "int8":
+        bytes_per_param = 1
+    elif precision == "int4":
+        bytes_per_param = 0.5
+    else:
+        bytes_per_param = 2
+    return params * bytes_per_param / 1e9
 
-# Simple local estimation logic (placeholder)
-def estimate_resources_local(params, dataset_size_gb, batch_size, epochs):
-    model_size_gb = params_to_gb(params)
-    # Fine-tuning
-    memory_required_gb = model_size_gb * 2 + batch_size * 0.01
-    compute_required_gpu_hours = dataset_size_gb * epochs * 0.5 / batch_size
-    # Inference (simplified)
-    inf_memory_gb = model_size_gb + batch_size * 0.005
-    inf_compute_gpu_hours = dataset_size_gb * 0.1 / batch_size
+# Local estimation logic with method/precision
+def estimate_resources_local(params, dataset_size_gb, batch_size, epochs, method, precision, seq_len=2048, gpu_capacity=80):
+    model_size_gb = params_to_gb(params, precision)
+    # === Fine-tuning ===
+    param_mem = model_size_gb
+    if method == "full":
+        opt_mem = param_mem * 2
+        act_mem = param_mem * (seq_len / 2048) * (batch_size / 4)
+        total_mem_ft = param_mem + opt_mem + act_mem
+    elif method == "lora":
+        total_mem_ft = (param_mem * 0.25) + 2
+    else:  # qlora
+        total_mem_ft = (param_mem * 0.15) + 1.5
+    gpus_ft = math.ceil(total_mem_ft / gpu_capacity)
+    flops_ft = 6 * params  # FLOPs per token
+    # === Inference ===
+    act_mem_inf = param_mem * (seq_len / 2048) * (batch_size / 4)
+    total_mem_inf = param_mem + act_mem_inf
+    gpus_inf = math.ceil(total_mem_inf / gpu_capacity)
+    flops_inf = 2 * params  # forward pass FLOPs
     return {
-        'memory_gb': round(memory_required_gb, 2),
-        'gpu_hours': round(compute_required_gpu_hours, 2),
-        'inf_memory_gb': round(inf_memory_gb, 2),
-        'inf_gpu_hours': round(inf_compute_gpu_hours, 2)
+        'memory_gb': round(total_mem_ft, 2),
+        'gpu_hours': round(dataset_size_gb * epochs * 0.5 / batch_size, 2),
+        'inf_memory_gb': round(total_mem_inf, 2),
+        'inf_gpu_hours': round(dataset_size_gb * 0.1 / batch_size, 2),
+        'gpus_ft': gpus_ft,
+        'flops_ft': flops_ft,
+        'gpus_inf': gpus_inf,
+        'flops_inf': flops_inf
     }
 
-def estimate_resources_gemini(params, dataset_size_gb, batch_size, epochs):
-    model_size_gb = params_to_gb(params)
+def estimate_resources_gemini(params, dataset_size_gb, batch_size, epochs, method, precision, seq_len=2048, gpu_capacity=80):
+    model_size_gb = params_to_gb(params, precision)
     prompt = (
         f"""
         Given the following parameters for fine-tuning a large language model (LLM):\n"
         f"Number of parameters: {params:.0f}\n"
-        f"Model size: {model_size_gb:.2f} GB (FP16)\n"
+        f"Model size: {model_size_gb:.2f} GB ({precision})\n"
         f"Dataset size: {dataset_size_gb} GB\n"
         f"Batch size: {batch_size}\n"
         f"Epochs: {epochs}\n"
+        f"Fine-tuning method: {method}\n"
+        f"Precision: {precision}\n"
+        f"Sequence length: {seq_len}\n"
+        f"GPU memory per GPU: {gpu_capacity} GB\n"
         """
-        "Estimate the required GPU memory (in GB) and total compute (in GPU-hours) for this fine-tuning job, and also for inference (single forward pass per batch).\n"
-        "Respond ONLY in the following JSON format: {\"memory_gb\": <float>, \"gpu_hours\": <float>, \"inf_memory_gb\": <float>, \"inf_gpu_hours\": <float>}"
+        "Estimate the required GPU memory (in GB), number of GPUs, and total compute (in GPU-hours) for this fine-tuning job, and also for inference (single forward pass per batch).\n"
+        "Respond ONLY in the following JSON format: {\"memory_gb\": <float>, \"gpu_hours\": <float>, \"inf_memory_gb\": <float>, \"inf_gpu_hours\": <float>, \"gpus_ft\": <int>, \"flops_ft\": <float>, \"gpus_inf\": <int>, \"flops_inf\": <float>}"
     )
     headers = {
         'Content-Type': 'application/json',
@@ -126,10 +156,43 @@ TEMPLATE = """
                     </select>
                 </div>
                 <div class=\"col-md-6\">
-                    <label>Calculation Method</label>
+                    <label>Fine-tuning Method</label>
                     <select name=\"method\" class=\"form-select\">
-                        <option value=\"local\" {% if form_data and form_data.method == 'local' %}selected{% endif %}>Local Estimate</option>
-                        <option value=\"gemini\" {% if form_data and form_data.method == 'gemini' %}selected{% endif %}>Gemini (LLM-powered)</option>
+                        <option value=\"full\" {% if form_data and form_data.method == 'full' %}selected{% endif %}>Full Fine-tuning</option>
+                        <option value=\"lora\" {% if form_data and form_data.method == 'lora' %}selected{% endif %}>LoRA</option>
+                        <option value=\"qlora\" {% if form_data and form_data.method == 'qlora' %}selected{% endif %}>QLoRA</option>
+                    </select>
+                </div>
+                <div class=\"col-md-6\">
+                    <label>Precision</label>
+                    <select name=\"precision\" class=\"form-select\">
+                        <option value=\"fp16\" {% if form_data and form_data.precision == 'fp16' %}selected{% endif %}>FP16 / BF16</option>
+                        <option value=\"fp32\" {% if form_data and form_data.precision == 'fp32' %}selected{% endif %}>FP32</option>
+                        <option value=\"int8\" {% if form_data and form_data.precision == 'int8' %}selected{% endif %}>8-bit</option>
+                        <option value=\"int4\" {% if form_data and form_data.precision == 'int4' %}selected{% endif %}>4-bit</option>
+                    </select>
+                </div>
+                <div class=\"col-md-6\">
+                    <label>Sequence Length (tokens)</label>
+                    <select name=\"seq_len\" class=\"form-select\">
+                        {% for val in [512, 1024, 2048, 4096, 8192, 16384] %}
+                        <option value=\"{{ val }}\" {% if form_data and form_data.seq_len == val|string %}selected{% endif %}>{{ val }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class=\"col-md-6\">
+                    <label>GPU Memory Capacity (GB per GPU)</label>
+                    <select name=\"gpu_capacity\" class=\"form-select\">
+                        {% for val in [16, 24, 32, 40, 48, 80] %}
+                        <option value=\"{{ val }}\" {% if form_data and form_data.gpu_capacity == val|string %}selected{% endif %}>{{ val }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class=\"col-md-6\">
+                    <label>Calculation Method</label>
+                    <select name=\"calculation_method\" class=\"form-select\">
+                        <option value=\"local\" {% if form_data and form_data.calculation_method == 'local' %}selected{% endif %}>Local Estimate</option>
+                        <option value=\"gemini\" {% if form_data and form_data.calculation_method == 'gemini' %}selected{% endif %}>Gemini (LLM-powered)</option>
                     </select>
                 </div>
                 <div class=\"col-12\" style=\"display: flex; align-items: center;\">
@@ -148,8 +211,9 @@ TEMPLATE = """
                 {% if result.error %}
                     <li class=\"list-group-item text-danger\"><b>Error:</b> {{ result.error }}</li>
                 {% else %}
-                    <li class=\"list-group-item\"><b>Estimated Memory Required:</b> {{ result.memory_gb }} GB</li>
-                    <li class=\"list-group-item\"><b>Estimated Compute Required:</b> {{ result.gpu_hours }} GPU-hours</li>
+                    <li class=\"list-group-item\"><b>Total GPU Memory Needed:</b> {{ result.memory_gb }} GB</li>
+                    <li class=\"list-group-item\"><b>GPUs Required:</b> {{ result.gpus_ft }}</li>
+                    <li class=\"list-group-item\"><b>Compute per token:</b> {{ result.flops_ft | scientific }} FLOPs</li>
                 {% endif %}
             </ul>
         </div>
@@ -159,8 +223,9 @@ TEMPLATE = """
                 {% if result.error %}
                     <li class=\"list-group-item text-danger\"><b>Error:</b> {{ result.error }}</li>
                 {% else %}
-                    <li class=\"list-group-item\"><b>Estimated Memory Required:</b> {{ result.inf_memory_gb }} GB</li>
-                    <li class=\"list-group-item\"><b>Estimated Compute Required:</b> {{ result.inf_gpu_hours }} GPU-hours</li>
+                    <li class=\"list-group-item\"><b>GPU Memory per Batch:</b> {{ result.inf_memory_gb }} GB</li>
+                    <li class=\"list-group-item\"><b>GPUs Required:</b> {{ result.gpus_inf }}</li>
+                    <li class=\"list-group-item\"><b>Compute per forward pass:</b> {{ result.flops_inf | scientific }} FLOPs</li>
                 {% endif %}
             </ul>
         </div>
@@ -179,6 +244,10 @@ TEMPLATE = """
 </html>
 """
 
+@app.template_filter('scientific')
+def scientific_notation(value):
+    return "{:.2e}".format(value)
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     result = None
@@ -191,10 +260,14 @@ def index():
             batch_size = int(form_data['batch_size'])
             epochs = int(form_data['epochs'])
             method = form_data['method']
-            if method == 'gemini':
-                result = estimate_resources_gemini(params, dataset_size_gb, batch_size, epochs)
+            precision = form_data['precision']
+            seq_len = int(form_data['seq_len'])
+            gpu_capacity = int(form_data['gpu_capacity'])
+            calculation_method = form_data.get('calculation_method', 'local')
+            if calculation_method == 'gemini':
+                result = estimate_resources_gemini(params, dataset_size_gb, batch_size, epochs, method, precision, seq_len, gpu_capacity)
             else:
-                result = estimate_resources_local(params, dataset_size_gb, batch_size, epochs)
+                result = estimate_resources_local(params, dataset_size_gb, batch_size, epochs, method, precision, seq_len, gpu_capacity)
         except Exception as e:
             result = {'error': str(e)}
     return render_template_string(TEMPLATE, result=result, form_data=request.form if request.method == 'POST' else None)
