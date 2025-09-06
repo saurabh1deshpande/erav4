@@ -92,8 +92,8 @@ TEMPLATE = """
         .form-control, .form-select { background-color: #2a2a2a; border: 1px solid #444; color: #e0e0e0; }
         .form-control:focus, .form-select:focus { background-color: #333; border-color: #0d6efd; color: #fff; }
         .list-group-item { background-color: transparent; border-color: #333; color: #e0e0e0; }
-        .loader-container { display: none; justify-content: center; align-items: center; margin-top: 24px; }
-        .show-loader { display: flex !important; }
+        .inline-loader { display: none; vertical-align: middle; margin-left: 10px; }
+        .show-inline-loader { display: inline-block !important; }
     </style>
 </head>
 <body>
@@ -132,16 +132,14 @@ TEMPLATE = """
                         <option value=\"gemini\" {% if form_data and form_data.method == 'gemini' %}selected{% endif %}>Gemini (LLM-powered)</option>
                     </select>
                 </div>
-                <div class=\"col-12\">
-                    <button type=\"submit\" class=\"btn btn-primary px-4\">Calculate</button>
+                <div class=\"col-12\" style=\"display: flex; align-items: center;\">
+                    <button type=\"submit\" class=\"btn btn-primary px-4\" id=\"calc-btn\">Calculate</button>
+                    <span class=\"inline-loader\" id=\"inline-loader\">
+                        <span class=\"spinner-border spinner-border-sm text-primary\" role=\"status\" aria-hidden=\"true\"></span>
+                        <span class=\"visually-hidden\">Loading...</span>
+                    </span>
                 </div>
             </form>
-            <div class=\"loader-container\" id=\"loader\">
-                <div class=\"spinner-border text-primary\" role=\"status\" style=\"width: 3rem; height: 3rem;\">
-                  <span class=\"visually-hidden\">Loading...</span>
-                </div>
-                <span class=\"ms-3\">Processing...</span>
-            </div>
         </div>
         {% if result %}
         <div class=\"card p-4 mt-4 result-card\">
@@ -170,10 +168,10 @@ TEMPLATE = """
     </div>
     <script>
         const form = document.getElementById('calc-form');
-        const loader = document.getElementById('loader');
+        const loader = document.getElementById('inline-loader');
         if (form && loader) {
             form.addEventListener('submit', function() {
-                loader.classList.add('show-loader');
+                loader.classList.add('show-inline-loader');
             });
         }
     </script>
