@@ -192,7 +192,7 @@ TEMPLATE = """
                     <label>Calculation Method</label>
                     <select name=\"calculation_method\" class=\"form-select\">
                         <option value=\"local\" {% if form_data and form_data.calculation_method == 'local' %}selected{% endif %}>Local Estimate</option>
-                        <option value=\"gemini\" {% if form_data and form_data.calculation_method == 'gemini' %}selected{% endif %}>Gemini (LLM-powered)</option>
+                        <option value=\"gemini\" {% if not form_data or form_data.calculation_method == 'gemini' %}selected{% endif %}>Gemini (LLM-powered)</option>
                     </select>
                 </div>
                 <div class=\"col-12\" style=\"display: flex; align-items: center;\">
